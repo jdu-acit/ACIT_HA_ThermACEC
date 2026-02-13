@@ -1,0 +1,43 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ACIT ThermACEC Setup",
+        "description": "Configure your ACIT ThermACEC board. Make sure your MQTT broker is accessible.",
+        "data": {
+          "name": "Device name",
+          "host": "MQTT broker address",
+          "port": "MQTT port",
+          "username": "Username (optional)",
+          "password": "Password (optional)",
+          "topic_prefix": "MQTT topic prefix"
+        },
+        "data_description": {
+          "name": "Custom name for your device",
+          "host": "IP address or hostname of MQTT broker (e.g., 10.0.0.213)",
+          "port": "MQTT broker port (default: 1883)",
+          "topic_prefix": "Prefix used for MQTT topics (e.g., acit/thermacec)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to MQTT broker",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "ACIT ThermaControl Options",
+        "description": "Modify settings for your ACIT ThermaControl integration.",
+        "data": {
+          "topic_prefix": "MQTT topic prefix"
+        }
+      }
+    }
+  }
+}
