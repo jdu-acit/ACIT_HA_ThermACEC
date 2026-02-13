@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configuration ACIT ThermACEC",
-        "description": "Ajoutez votre appareil ACIT ThermACEC",
+        "title": "Configuration ACIT",
+        "description": "Ajoutez votre appareil ACIT",
         "data": {
           "name": "Nom de l'appareil",
           "host": "Adresse IP",
@@ -17,7 +17,7 @@
       },
       "manual": {
         "title": "Configuration manuelle",
-        "description": "Entrez l'adresse IP de votre appareil ACIT ThermACEC",
+        "description": "Entrez l'adresse IP de votre appareil ACIT",
         "data": {
           "name": "Nom de l'appareil",
           "host": "Adresse IP",
@@ -30,8 +30,8 @@
         }
       },
       "discovery_confirm": {
-        "title": "ACIT ThermACEC découvert",
-        "description": "Voulez-vous ajouter l'appareil découvert **{name}** ({host}) ?\n\nModèle: {model}"
+        "title": "Appareil ACIT découvert",
+        "description": "Voulez-vous ajouter l'appareil découvert **{name}** ({host}) ?\n\nModèle: **{model}**"
       }
     },
     "error": {
