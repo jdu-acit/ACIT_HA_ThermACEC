@@ -10,16 +10,18 @@ Home Assistant custom integration for ACIT ThermACEC electronic board - Ambient 
 
 - 🌡️ **Ambient temperature sensor** - Real-time reading
 - 🎯 **Temperature setpoint control** - Complete climate entity
-- 🔄 **MQTT support** - Uses your existing Mosquitto broker
-- � **Multi-language interface** - Complete translations (FR/EN)
+- 🚀 **HTTP RPC API** - JSON-RPC 2.0 protocol for commands
+- 📡 **WebSocket notifications** - Real-time push updates
+- 🔍 **mDNS auto-discovery** - Automatic device detection via Zeroconf
+- 🌐 **Multi-language interface** - Complete translations (FR/EN)
 - ⚙️ **UI configuration** - No manual YAML editing
-- 🔍 **Auto-discovery** - Automatic device detection
+- 🏠 **Local control** - Direct communication, no cloud or broker required
 
 ## 📋 Prerequisites
 
 - Home Assistant 2024.1.0 or higher
-- Configured MQTT broker (Mosquitto recommended)
-- ACIT ThermACEC electronic board configured
+- ACIT ThermACEC electronic board with firmware v2.0+
+- Local network connectivity (device and Home Assistant on same network)
 
 ## 📦 Installation
 
@@ -43,39 +45,73 @@ Home Assistant custom integration for ACIT ThermACEC electronic board - Ambient 
 
 ## ⚙️ Configuration
 
-### 1. Add the integration
+### Option 1: Automatic Discovery (Recommended)
+
+1. Power on your ACIT ThermACEC board
+2. Go to **Settings** → **Devices & Services**
+3. The device should appear automatically in **Discovered** section
+4. Click **Configure** and confirm the device
+
+### Option 2: Manual Configuration
 
 1. Go to **Settings** → **Devices & Services**
 2. Click **+ Add Integration**
 3. Search for **ACIT ThermACEC**
-4. Follow the on-screen instructions
+4. Enter the device information:
+   - **Device Name**: Custom name for your board
+   - **IP Address**: Device IP (e.g., `10.0.0.41`)
+   - **Port**: HTTP port (default: `80`)
 
-### 2. MQTT Configuration
+## 🔌 Architecture
 
-During configuration, you will need to provide:
+### HTTP RPC API
 
-- **MQTT Broker**: Your broker address (e.g., `10.0.0.213`)
-- **Port**: MQTT port (default: `1883`)
-- **Base Topic**: MQTT topic prefix (e.g., `acit`)
-- **Device Name**: Custom name for your board
+The integration uses JSON-RPC 2.0 protocol over HTTP for commands:
 
-### 3. Expected MQTT Topics
+**Endpoint**: `http://<device-ip>/rpc`
 
-The integration subscribes to the following topics:
+**Available Methods**:
+- `Thermostat.GetStatus` - Get current temperature, setpoint, heater level, fan speed
+- `Thermostat.GetConfig` - Get device configuration (model, version, MAC address, limits)
+- `Thermostat.SetTargetTemp` - Set temperature setpoint
 
+**Example Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "Thermostat.SetTargetTemp",
+  "params": {
+    "temperature": 22.5
+  }
+}
 ```
-acit/temperature        # Ambient temperature (°C)
-acit/target_temperature # Temperature setpoint (°C)
-acit/hvac_mode          # Mode: off, heat, cool, auto
-acit/availability       # online/offline
+
+### WebSocket Notifications
+
+Real-time updates are pushed via WebSocket:
+
+**Endpoint**: `ws://<device-ip>/ws`
+
+**Notification Format**:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "NotifyStatus",
+  "params": {
+    "temperature": 21.8,
+    "target_temperature": 22.0,
+    "heater_level": 0,
+    "fan_speed": 1
+  }
+}
 ```
 
-Command topics (publish):
+### mDNS Discovery
 
-```
-acit/set/target_temperature  # Set the setpoint
-acit/set/hvac_mode           # Change the mode
-```
+Devices advertise themselves via mDNS:
+- **Service Type**: `_acit._tcp.local.`
+- **Hostname Pattern**: `acit-thermacec-<MAC>.local`
 
 ## 📊 Created Entities
 
@@ -83,25 +119,16 @@ acit/set/hvac_mode           # Change the mode
 - **Type**: `sensor`
 - **Class**: `temperature`
 - **Unit**: °C
-- **Update**: Real-time via MQTT
+- **Update**: Real-time via WebSocket notifications
 
-### Temperature Control
+### Thermostat (Climate Entity)
 - **Type**: `climate`
-- **Modes**: Off, Heat, Cool, Auto
-- **Temperature Range**: 5°C - 35°C
+- **Mode**: Heat (automatic control by device)
+- **Temperature Range**: 5°C - 35°C (configurable on device)
 - **Precision**: 0.1°C
-
-## 🔧 Board Configuration Example
-
-Your ACIT board must publish to MQTT in this format:
-
-```json
-{
-  "temperature": 21.5,
-  "target_temperature": 22.0,
-  "hvac_mode": "heat"
-}
-```
+- **Extra Attributes**:
+  - `heater_level`: Current heating level (0-100)
+  - `fan_speed`: Current fan speed (0-3)
 
 ## 🐛 Troubleshooting
 
@@ -111,11 +138,25 @@ Your ACIT board must publish to MQTT in this format:
 2. Restart Home Assistant
 3. Clear your browser cache (Ctrl+F5)
 
-### No data received
+### Device not discovered automatically
 
-1. Verify your MQTT broker is running
-2. Check MQTT topics with MQTT Explorer
-3. Check logs: **Settings** → **System** → **Logs**
+1. Verify the device is powered on and connected to the network
+2. Check that Home Assistant and the device are on the same network/VLAN
+3. Verify mDNS/Zeroconf is not blocked by your firewall
+4. Try manual configuration with the device IP address
+
+### Cannot connect to device
+
+1. Verify the device IP address is correct
+2. Test HTTP connection: `curl http://<device-ip>/rpc`
+3. Check firewall rules (port 80 must be accessible)
+4. Check logs: **Settings** → **System** → **Logs**
+
+### No real-time updates
+
+1. Verify WebSocket connection in logs
+2. Check that port 80 is not blocked for WebSocket upgrade
+3. The integration will fall back to polling if WebSocket fails
 
 ### Detailed Logs
 
@@ -148,5 +189,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Home Assistant Community
 - HACS for easy distribution
-- Mosquitto MQTT Broker
+- Shelly Gen2 architecture inspiration
 

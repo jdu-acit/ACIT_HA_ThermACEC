@@ -48,14 +48,17 @@ class ACITTemperatureSensor(CoordinatorEntity, SensorEntity):
     ) -> None:
         """Initialiser le capteur de température."""
         super().__init__(coordinator)
-        self._attr_unique_id = f"{entry.entry_id}_temperature"
-        self._attr_name = "Température ambiante"
+        device_info = coordinator.device_info
+        mac_address = device_info.get("mac_address", entry.entry_id)
+
+        self._attr_unique_id = f"{mac_address}_temperature"
+        self._attr_name = "Température"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
+            "identifiers": {(DOMAIN, mac_address)},
             "name": entry.data.get("device_name", "ACIT ThermACEC"),
-            "manufacturer": "ACIT",
-            "model": "ThermACEC v1.0",
-            "sw_version": "1.0.0",
+            "manufacturer": device_info.get("manufacturer", "ACIT"),
+            "model": device_info.get("model", "ThermACEC"),
+            "sw_version": device_info.get("version", "Unknown"),
         }
 
     @property

@@ -1,17 +1,15 @@
 # Exemples de code pour carte ACIT ThermACEC
 
-Ce dossier contient des exemples de code pour différentes plateformes matérielles.
+Ce dossier contient un exemple de code pour ESP32 avec l'architecture Shelly Gen2.
 
-## 📁 Fichiers disponibles
+## 📁 Fichier disponible
 
 ### esp32_example.ino
-Code complet pour ESP32/ESP8266 avec :
-- Connexion WiFi
-- Client MQTT
-- Lecture capteur DHT22
-- Publication des données
-- Réception des commandes
-- Contrôle de relais
+Code complet pour ESP32 avec architecture Shelly Gen2 :
+- **HTTP RPC** (JSON-RPC 2.0) pour les commandes
+- **WebSocket** pour les notifications temps réel
+- **mDNS** pour l'auto-découverte
+- Compatible avec Home Assistant v2.0+
 
 ## 🔧 Prérequis
 
@@ -20,10 +18,11 @@ Code complet pour ESP32/ESP8266 avec :
 Installez ces bibliothèques via le gestionnaire de bibliothèques Arduino :
 
 ```
-- WiFi (incluse avec ESP32/ESP8266)
-- PubSubClient by Nick O'Leary
-- DHT sensor library by Adafruit
-- Adafruit Unified Sensor
+- WiFi (incluse avec ESP32)
+- ESPmDNS (incluse avec ESP32)
+- ESPAsyncWebServer by me-no-dev
+- AsyncTCP by me-no-dev
+- ArduinoJson by Benoit Blanchon (v6.x)
 ```
 
 ### Matériel requis
@@ -56,29 +55,28 @@ Relais IN  → ESP32 GPIO5
 ### 1. Modifier les paramètres WiFi
 
 ```cpp
-const char* ssid = "VOTRE_SSID";
-const char* password = "VOTRE_MOT_DE_PASSE";
+const char* ssid = "YOUR_SSID";
+const char* password = "YOUR_PASSWORD";
 ```
 
-### 2. Modifier l'adresse MQTT
+### 2. Personnaliser le nom de l'appareil (optionnel)
 
 ```cpp
-const char* mqtt_server = "10.0.0.213";  // Votre broker
-const int mqtt_port = 1883;
+String deviceName = "acit-thermacec";  // Sera: acit-thermacec-<MAC>.local
 ```
 
-### 3. Modifier les topics (optionnel)
+### 3. Adapter la lecture de température
+
+Remplacez la simulation par votre capteur réel :
 
 ```cpp
-const char* topic_temperature = "acit/thermacec/temperature";
-// etc.
-```
+// Dans loop(), remplacez:
+// currentTemperature = readTemperatureSensor();
 
-### 4. Configurer les GPIO
-
-```cpp
-#define DHTPIN 4      // GPIO pour DHT22
-#define RELAY_PIN 5   // GPIO pour relais
+// Par exemple avec DHT22:
+#include <DHT.h>
+DHT dht(4, DHT22);
+currentTemperature = dht.readTemperature();
 ```
 
 ## 📤 Upload du code
@@ -114,20 +112,37 @@ Chauffage: ON
 
 ## 🧪 Test rapide
 
-### Publier une commande de test
+### Tester la découverte mDNS
 
 ```bash
-# Changer la consigne
-mosquitto_pub -h 10.0.0.213 -t acit/thermacec/set/target_temperature -m "22.5"
+# Linux/Mac
+dns-sd -B _acit._tcp local
 
-# Changer le mode
-mosquitto_pub -h 10.0.0.213 -t acit/thermacec/set/hvac_mode -m "heat"
+# Windows (avec Bonjour Print Services)
+dns-sd -B _acit._tcp local
 ```
 
-### Écouter les publications
+### Tester l'API RPC
 
 ```bash
-mosquitto_sub -h 10.0.0.213 -t 'acit/thermacec/#' -v
+# Obtenir le statut
+curl -X POST http://acit-thermacec-<MAC>.local/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"Thermostat.GetStatus","params":{}}'
+
+# Changer la consigne
+curl -X POST http://acit-thermacec-<MAC>.local/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"Thermostat.SetTargetTemp","params":{"temperature":22.5}}'
+```
+
+### Tester le WebSocket
+
+```bash
+# Installer wscat: npm install -g wscat
+wscat -c ws://acit-thermacec-<MAC>.local/ws
+
+# Vous devriez recevoir des notifications NotifyStatus
 ```
 
 ## 🎯 Personnalisation
@@ -186,24 +201,31 @@ WiFiClientSecure espClient;
 - Vérifiez que le WiFi est en 2.4GHz (pas 5GHz)
 - Vérifiez la portée du signal
 
-### Pas de connexion MQTT
+### mDNS ne fonctionne pas
 
-- Vérifiez l'adresse IP du broker
-- Vérifiez que le port 1883 est ouvert
-- Testez avec `mosquitto_pub` depuis un PC
+- Vérifiez que votre routeur supporte mDNS/Bonjour
+- Essayez d'accéder par IP directement
+- Sur Windows, installez Bonjour Print Services
 
-### Température incorrecte
+### Home Assistant ne découvre pas l'appareil
 
-- Vérifiez le câblage du DHT22
-- Vérifiez la résistance pull-up (10kΩ)
-- Testez avec un exemple simple DHT22
+- Vérifiez que Home Assistant et l'ESP32 sont sur le même réseau/VLAN
+- Vérifiez les logs série de l'ESP32
+- Essayez la configuration manuelle avec l'IP
+
+### WebSocket se déconnecte
+
+- Normal si aucun client n'est connecté
+- Home Assistant se reconnecte automatiquement
+- Vérifiez les logs pour les erreurs
 
 ## 💡 Améliorations possibles
 
-- [ ] Ajouter un écran OLED
-- [ ] Ajouter un bouton physique
+- [ ] Ajouter un écran OLED pour affichage local
+- [ ] Ajouter des boutons physiques pour contrôle manuel
 - [ ] Implémenter OTA (mise à jour sans fil)
-- [ ] Ajouter un mode deep sleep
-- [ ] Implémenter MQTT Discovery
-- [ ] Ajouter un watchdog
+- [ ] Ajouter la persistance des paramètres (EEPROM/SPIFFS)
+- [ ] Implémenter un mode AP pour configuration initiale
+- [ ] Ajouter un watchdog pour redémarrage automatique
+- [ ] Implémenter TLS/SSL pour sécurité accrue
 

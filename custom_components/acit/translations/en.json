@@ -3,52 +3,54 @@
     "step": {
       "user": {
         "title": "ACIT ThermACEC Setup",
-        "description": "Configure your ACIT ThermACEC board. Make sure your MQTT broker is accessible.",
+        "description": "Add your ACIT ThermACEC device",
         "data": {
           "name": "Device name",
-          "host": "MQTT broker address",
-          "port": "MQTT port",
-          "username": "Username (optional)",
-          "password": "Password (optional)",
-          "topic_prefix": "MQTT topic prefix"
+          "host": "IP address",
+          "port": "Port"
         },
         "data_description": {
           "name": "Custom name for your device",
-          "host": "IP address or hostname of MQTT broker (e.g., 10.0.0.213)",
-          "port": "MQTT broker port (default: 1883)",
-          "topic_prefix": "Prefix used for MQTT topics (e.g., acit/thermacec)"
+          "host": "IP address of the device (e.g., 10.0.0.41)",
+          "port": "HTTP port (default: 80)"
         }
+      },
+      "manual": {
+        "title": "Manual Configuration",
+        "description": "Enter the IP address of your ACIT ThermACEC device",
+        "data": {
+          "name": "Device name",
+          "host": "IP address",
+          "port": "Port"
+        },
+        "data_description": {
+          "name": "Custom name for your device",
+          "host": "IP address of the device (e.g., 10.0.0.41)",
+          "port": "HTTP port (default: 80)"
+        }
+      },
+      "discovery_confirm": {
+        "title": "Discovered ACIT ThermACEC",
+        "description": "Do you want to add the discovered device **{name}** ({host})?\n\nModel: {model}"
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to MQTT broker",
-      "invalid_auth": "Invalid authentication",
+      "cannot_connect": "Failed to connect to device",
       "unknown": "Unexpected error"
     },
     "abort": {
       "already_configured": "Device is already configured"
     }
   },
-  "options": {
-    "step": {
-      "init": {
-        "title": "ACIT ThermACEC Options",
-        "description": "Modify settings for your ACIT ThermACEC integration.",
-        "data": {
-          "topic_prefix": "MQTT topic prefix"
-        }
-      }
-    }
-  },
   "entity": {
     "sensor": {
       "temperature": {
-        "name": "Ambient temperature"
+        "name": "Temperature"
       }
     },
     "climate": {
       "thermacontrol": {
-        "name": "Temperature control"
+        "name": "Thermostat"
       }
     }
   }

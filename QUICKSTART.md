@@ -20,58 +20,66 @@ Settings → System → Restart
 
 ### 3. Add the integration (2 minutes)
 
+**Option A: Automatic Discovery (Easiest)**
+```
+Settings → Devices & Services
+Look for "Discovered" section
+Click "Configure" on ACIT ThermACEC
+Confirm the device
+```
+
+**Option B: Manual Configuration**
 ```
 Settings → Devices & Services → + Add Integration
 Search: ACIT ThermACEC
 ```
 
-**Minimal configuration:**
+**Configuration:**
 - Name: `My Thermostat`
-- MQTT Broker: `10.0.0.213`
-- Port: `1883`
-- Topic: `acit`
+- IP Address: `10.0.0.41` (your device IP)
+- Port: `80` (default)
 
 ## 🔌 Board Configuration (ESP32)
 
-### Minimal Code
+### Architecture Overview
 
-```cpp
-#include <WiFi.h>
-#include <PubSubClient.h>
+The ACIT ThermACEC uses a **Shelly Gen2-style architecture**:
+- **HTTP RPC** (JSON-RPC 2.0) for commands
+- **WebSocket** for real-time notifications
+- **mDNS** for auto-discovery
 
-const char* mqtt_server = "10.0.0.213";
-WiFiClient espClient;
-PubSubClient client(espClient);
+### Required Features
 
-void setup() {
-  WiFi.begin("SSID", "PASSWORD");
-  client.setServer(mqtt_server, 1883);
-}
+Your ESP32 firmware must implement:
 
-void loop() {
-  if (!client.connected()) reconnect();
-  client.loop();
+1. **mDNS Service**
+   - Service type: `_acit._tcp.local.`
+   - Hostname: `acit-thermacec-<MAC>.local`
 
-  // Publish temperature every 10s
-  static unsigned long last = 0;
-  if (millis() - last > 10000) {
-    last = millis();
-    float temp = 21.5; // Read your sensor here
-    client.publish("acit/temperature", String(temp).c_str());
-    client.publish("acit/availability", "online");
-  }
-}
+2. **HTTP RPC Endpoint** (`/rpc`)
+   - `Thermostat.GetStatus` - Return current state
+   - `Thermostat.GetConfig` - Return device info
+   - `Thermostat.SetTargetTemp` - Set temperature setpoint
 
-void reconnect() {
-  while (!client.connected()) {
-    if (client.connect("ACIT_Board")) {
-      client.subscribe("acit/set/#");
-    } else {
-      delay(5000);
-    }
-  }
+3. **WebSocket Endpoint** (`/ws`)
+   - Push `NotifyStatus` when state changes
+
+### Example RPC Response
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "temperature": 21.8,
+    "target_temperature": 22.0,
+    "heater_level": 0,
+    "fan_speed": 1
+  },
+  "id": 1
 }
 ```
+
+See [examples/esp32_example.ino](examples/esp32_example.ino) for complete implementation.
 
 ## 🎨 First Lovelace Card
 
@@ -85,14 +93,30 @@ name: My Thermostat
 
 ## ✅ Quick Test
 
-### Test with MQTT
+### Test RPC Connection
 
 ```bash
-# Publish a test temperature
-mosquitto_pub -h 10.0.0.213 -t acit/temperature -m "22.5"
+# Test GetStatus method
+curl -X POST http://10.0.0.41/rpc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "Thermostat.GetStatus",
+    "params": {}
+  }'
 
-# Check in Home Assistant
-# Temperature should display immediately
+# Expected response:
+# {"jsonrpc":"2.0","result":{"temperature":21.8,"target_temperature":22.0,...},"id":1}
+```
+
+### Test WebSocket Notifications
+
+```bash
+# Install wscat: npm install -g wscat
+wscat -c ws://10.0.0.41/ws
+
+# You should receive NotifyStatus messages when state changes
 ```
 
 ## 🎯 First Automation
@@ -113,11 +137,18 @@ automation:
 
 ## 🆘 Problem?
 
+### Device not discovered?
+
+1. Check device is on same network as Home Assistant
+2. Try manual configuration with IP address
+3. Verify mDNS is not blocked by firewall
+
 ### Temperature not displaying?
 
 ```bash
-# Check MQTT topics
-mosquitto_sub -h 10.0.0.213 -t 'acit/#' -v
+# Test RPC connection
+curl http://10.0.0.41/rpc -X POST \
+  -d '{"jsonrpc":"2.0","id":1,"method":"Thermostat.GetStatus","params":{}}'
 ```
 
 ### Integration doesn't appear?

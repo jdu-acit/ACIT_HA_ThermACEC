@@ -32,14 +32,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = coordinator
     
     # Enregistrer l'appareil
+    device_info = coordinator.device_info
     device_registry = dr.async_get(hass)
     device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.entry_id)},
-        manufacturer="ACIT",
+        identifiers={(DOMAIN, device_info.get("mac_address", entry.entry_id))},
+        manufacturer=device_info.get("manufacturer", "ACIT"),
         name=entry.data.get("device_name", "ACIT ThermACEC"),
-        model="ThermACEC v1.0",
-        sw_version="1.0.0",
+        model=device_info.get("model", "ThermACEC"),
+        sw_version=device_info.get("version", "Unknown"),
     )
 
     # Configurer les plateformes

@@ -110,3 +110,6 @@ Thumbs.db
 
 # Internal documentation (not for public repository)
 docs_internal/
+
+# Internal tests (not for public repository)
+tests_internal/

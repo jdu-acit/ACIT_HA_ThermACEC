@@ -1,200 +1,192 @@
 /**
- * Exemple de code pour carte ACIT ThermACEC
- * Compatible ESP32 / ESP8266
- *
- * Ce code montre comment publier les données de température
- * et recevoir les commandes depuis Home Assistant via MQTT
+ * ACIT ThermACEC - ESP32 Example with HTTP RPC + WebSocket
+ * 
+ * This example demonstrates the Shelly Gen2-style architecture:
+ * - HTTP RPC (JSON-RPC 2.0) for commands
+ * - WebSocket for real-time notifications
+ * - mDNS for auto-discovery
+ * 
+ * Compatible with: ESP32
+ * Required libraries:
+ * - ESPAsyncWebServer
+ * - AsyncTCP
+ * - ArduinoJson
+ * - ESPmDNS
  */
 
 #include <WiFi.h>
-#include <PubSubClient.h>
-#include <DHT.h>
+#include <ESPmDNS.h>
+#include <ESPAsyncWebServer.h>
+#include <AsyncTCP.h>
+#include <ArduinoJson.h>
 
-// Configuration WiFi
-const char* ssid = "VOTRE_SSID";
-const char* password = "VOTRE_MOT_DE_PASSE";
+// WiFi Configuration
+const char* ssid = "YOUR_SSID";
+const char* password = "YOUR_PASSWORD";
 
-// Configuration MQTT
-const char* mqtt_server = "10.0.0.213";
-const int mqtt_port = 1883;
-const char* mqtt_user = "";  // Optionnel
-const char* mqtt_password = "";  // Optionnel
+// Device Configuration
+String deviceName = "acit-thermacec";
+String macAddress = "";
 
-// Topics MQTT
-const char* topic_temperature = "acit/thermacec/temperature";
-const char* topic_target_temperature = "acit/thermacec/target_temperature";
-const char* topic_hvac_mode = "acit/thermacec/hvac_mode";
-const char* topic_availability = "acit/thermacec/availability";
-const char* topic_set_target = "acit/thermacec/set/target_temperature";
-const char* topic_set_mode = "acit/thermacec/set/hvac_mode";
+// Temperature Control
+float currentTemperature = 21.8;
+float targetTemperature = 22.0;
+int heaterLevel = 0;
+int fanSpeed = 1;
 
-// Configuration capteur DHT
-#define DHTPIN 4
-#define DHTTYPE DHT22
-DHT dht(DHTPIN, DHTTYPE);
+// Web Server & WebSocket
+AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
 
-// Variables globales
-WiFiClient espClient;
-PubSubClient client(espClient);
-float currentTemperature = 20.0;
-float targetTemperature = 21.0;
-String hvacMode = "heat";
-unsigned long lastPublish = 0;
-const long publishInterval = 10000;  // 10 secondes
+// RPC ID counter
+int rpcId = 0;
 
 void setup() {
   Serial.begin(115200);
   
-  // Initialiser le capteur
-  dht.begin();
+  // Get MAC address
+  macAddress = WiFi.macAddress();
+  macAddress.replace(":", "");
+  macAddress.toLowerCase();
   
-  // Connexion WiFi
-  setup_wifi();
-  
-  // Configuration MQTT
-  client.setServer(mqtt_server, mqtt_port);
-  client.setCallback(mqtt_callback);
-}
-
-void loop() {
-  // Maintenir la connexion MQTT
-  if (!client.connected()) {
-    reconnect_mqtt();
-  }
-  client.loop();
-  
-  // Publier les données périodiquement
-  unsigned long now = millis();
-  if (now - lastPublish > publishInterval) {
-    lastPublish = now;
-    publish_data();
-  }
-}
-
-void setup_wifi() {
-  delay(10);
-  Serial.println();
-  Serial.print("Connexion à ");
-  Serial.println(ssid);
-  
+  // Connect to WiFi
   WiFi.begin(ssid, password);
-  
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  
-  Serial.println("");
-  Serial.println("WiFi connecté");
-  Serial.print("Adresse IP: ");
+  Serial.println("\nWiFi connected!");
+  Serial.print("IP: ");
   Serial.println(WiFi.localIP());
+  
+  // Setup mDNS
+  String hostname = deviceName + "-" + macAddress;
+  if (MDNS.begin(hostname.c_str())) {
+    MDNS.addService("acit", "tcp", 80);
+    Serial.println("mDNS started: " + hostname + ".local");
+  }
+  
+  // Setup WebSocket
+  ws.onEvent(onWsEvent);
+  server.addHandler(&ws);
+  
+  // Setup HTTP RPC endpoint
+  server.on("/rpc", HTTP_POST, handleRPC);
+  
+  // Start server
+  server.begin();
+  Serial.println("HTTP server started");
 }
 
-void reconnect_mqtt() {
-  while (!client.connected()) {
-    Serial.print("Connexion MQTT...");
+void loop() {
+  // Simulate temperature reading
+  static unsigned long lastRead = 0;
+  if (millis() - lastRead > 5000) {
+    lastRead = millis();
     
-    String clientId = "ACIT_ThermaControl_";
-    clientId += String(random(0xffff), HEX);
+    // Read your temperature sensor here
+    // currentTemperature = readTemperatureSensor();
     
-    if (client.connect(clientId.c_str(), mqtt_user, mqtt_password)) {
-      Serial.println("connecté");
-      
-      // Publier la disponibilité
-      client.publish(topic_availability, "online", true);
-      
-      // S'abonner aux topics de commande
-      client.subscribe(topic_set_target);
-      client.subscribe(topic_set_mode);
-      
-      Serial.println("Abonné aux topics de commande");
+    // Simulate heating control
+    if (currentTemperature < targetTemperature) {
+      heaterLevel = 50;
+      fanSpeed = 2;
     } else {
-      Serial.print("échec, rc=");
-      Serial.print(client.state());
-      Serial.println(" nouvelle tentative dans 5 secondes");
-      delay(5000);
+      heaterLevel = 0;
+      fanSpeed = 1;
     }
+    
+    // Send WebSocket notification
+    notifyStatus();
   }
+  
+  ws.cleanupClients();
 }
 
-void mqtt_callback(char* topic, byte* payload, unsigned int length) {
-  // Convertir le payload en String
-  String message = "";
-  for (int i = 0; i < length; i++) {
-    message += (char)payload[i];
-  }
+void handleRPC(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+  StaticJsonDocument<512> doc;
+  DeserializationError error = deserializeJson(doc, data, len);
   
-  Serial.print("Message reçu [");
-  Serial.print(topic);
-  Serial.print("]: ");
-  Serial.println(message);
-  
-  // Traiter les commandes
-  if (strcmp(topic, topic_set_target) == 0) {
-    // Nouvelle consigne de température
-    targetTemperature = message.toFloat();
-    Serial.print("Nouvelle consigne: ");
-    Serial.print(targetTemperature);
-    Serial.println("°C");
-    
-    // Republier immédiatement
-    client.publish(topic_target_temperature, String(targetTemperature).c_str());
-    
-    // TODO: Activer/désactiver le chauffage selon la consigne
-    control_heating();
-  }
-  else if (strcmp(topic, topic_set_mode) == 0) {
-    // Nouveau mode HVAC
-    hvacMode = message;
-    Serial.print("Nouveau mode: ");
-    Serial.println(hvacMode);
-    
-    // Republier immédiatement
-    client.publish(topic_hvac_mode, hvacMode.c_str());
-    
-    // TODO: Gérer le mode (off, heat, cool, auto)
-    control_heating();
-  }
-}
-
-void publish_data() {
-  // Lire la température du capteur
-  currentTemperature = dht.readTemperature();
-  
-  if (isnan(currentTemperature)) {
-    Serial.println("Erreur de lecture du capteur DHT!");
+  if (error) {
+    request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
     return;
   }
   
-  Serial.print("Température: ");
-  Serial.print(currentTemperature);
-  Serial.println("°C");
+  String method = doc["method"];
+  int id = doc["id"];
   
-  // Publier les données
-  client.publish(topic_temperature, String(currentTemperature, 1).c_str());
-  client.publish(topic_target_temperature, String(targetTemperature, 1).c_str());
-  client.publish(topic_hvac_mode, hvacMode.c_str());
-  client.publish(topic_availability, "online");
+  StaticJsonDocument<512> response;
+  response["jsonrpc"] = "2.0";
+  response["id"] = id;
+  
+  if (method == "Thermostat.GetStatus") {
+    JsonObject result = response.createNestedObject("result");
+    result["temperature"] = currentTemperature;
+    result["target_temperature"] = targetTemperature;
+    result["heater_level"] = heaterLevel;
+    result["fan_speed"] = fanSpeed;
+    
+  } else if (method == "Thermostat.GetConfig") {
+    JsonObject result = response.createNestedObject("result");
+    result["model"] = "ThermACEC";
+    result["version"] = "2.0.0";
+    result["manufacturer"] = "ACIT";
+    result["mac_address"] = macAddress;
+    result["min_temp"] = 5;
+    result["max_temp"] = 35;
+    JsonArray features = result.createNestedArray("features");
+    features.add("heating");
+    features.add("fan");
+    
+  } else if (method == "Thermostat.SetTargetTemp") {
+    float temp = doc["params"]["temperature"];
+    if (temp >= 5 && temp <= 35) {
+      targetTemperature = temp;
+      JsonObject result = response.createNestedObject("result");
+      result["success"] = true;
+      result["target_temperature"] = targetTemperature;
+      notifyStatus();
+    } else {
+      JsonObject error = response.createNestedObject("error");
+      error["code"] = -32602;
+      error["message"] = "Invalid temperature range";
+    }
+
+  } else {
+    JsonObject error = response.createNestedObject("error");
+    error["code"] = -32601;
+    error["message"] = "Method not found";
+  }
+
+  String output;
+  serializeJson(response, output);
+  request->send(200, "application/json", output);
 }
 
-void control_heating() {
-  // Logique de contrôle du chauffage
-  if (hvacMode == "off") {
-    // Éteindre le chauffage
-    digitalWrite(RELAY_PIN, LOW);
-    Serial.println("Chauffage: OFF");
+void notifyStatus() {
+  StaticJsonDocument<256> doc;
+  doc["jsonrpc"] = "2.0";
+  doc["method"] = "NotifyStatus";
+
+  JsonObject params = doc.createNestedObject("params");
+  params["temperature"] = currentTemperature;
+  params["target_temperature"] = targetTemperature;
+  params["heater_level"] = heaterLevel;
+  params["fan_speed"] = fanSpeed;
+
+  String output;
+  serializeJson(doc, output);
+  ws.textAll(output);
+}
+
+void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
+               AwsEventType type, void *arg, uint8_t *data, size_t len) {
+  if (type == WS_EVT_CONNECT) {
+    Serial.printf("WebSocket client #%u connected\n", client->id());
+    // Send initial status
+    notifyStatus();
+  } else if (type == WS_EVT_DISCONNECT) {
+    Serial.printf("WebSocket client #%u disconnected\n", client->id());
   }
-  else if (hvacMode == "heat") {
-    // Mode chauffage
-    if (currentTemperature < targetTemperature - 0.5) {
-      digitalWrite(RELAY_PIN, HIGH);
-      Serial.println("Chauffage: ON");
-    }
-    else if (currentTemperature > targetTemperature + 0.5) {
-      digitalWrite(RELAY_PIN, LOW);
-      Serial.println("Chauffage: OFF");
-    }
-  }
-  // TODO: Implémenter les modes cool et auto
 }
 

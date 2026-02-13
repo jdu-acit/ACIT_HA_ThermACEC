@@ -20,16 +20,6 @@ from .coordinator import ACITThermaControlCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# Mapping des modes HVAC
-HVAC_MODE_MAP = {
-    "off": HVACMode.OFF,
-    "heat": HVACMode.HEAT,
-    "cool": HVACMode.COOL,
-    "auto": HVACMode.AUTO,
-}
-
-HVAC_MODE_REVERSE_MAP = {v: k for k, v in HVAC_MODE_MAP.items()}
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -48,15 +38,8 @@ class ACITThermaControlClimate(CoordinatorEntity, ClimateEntity):
     """Entité Climate pour ACIT ThermaControl."""
 
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
-    _attr_supported_features = (
-        ClimateEntityFeature.TARGET_TEMPERATURE
-    )
-    _attr_hvac_modes = [
-        HVACMode.OFF,
-        HVACMode.HEAT,
-        HVACMode.COOL,
-        HVACMode.AUTO,
-    ]
+    _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
+    _attr_hvac_modes = [HVACMode.HEAT]  # Mode simplifié pour v2.0
     _attr_min_temp = MIN_TEMP
     _attr_max_temp = MAX_TEMP
     _attr_target_temperature_step = TEMP_STEP
@@ -69,15 +52,23 @@ class ACITThermaControlClimate(CoordinatorEntity, ClimateEntity):
     ) -> None:
         """Initialiser l'entité climate."""
         super().__init__(coordinator)
-        self._attr_unique_id = f"{entry.entry_id}_climate"
-        self._attr_name = "Contrôle température"
+        device_info = coordinator.device_info
+        mac_address = device_info.get("mac_address", entry.entry_id)
+
+        self._attr_unique_id = f"{mac_address}_climate"
+        self._attr_name = "Thermostat"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
-            "name": entry.data.get("device_name", "ACIT ThermaControl"),
-            "manufacturer": "ACIT",
-            "model": "ThermaControl v1.0",
-            "sw_version": "1.0.0",
+            "identifiers": {(DOMAIN, mac_address)},
+            "name": entry.data.get("device_name", "ACIT ThermACEC"),
+            "manufacturer": device_info.get("manufacturer", "ACIT"),
+            "model": device_info.get("model", "ThermACEC"),
+            "sw_version": device_info.get("version", "Unknown"),
         }
+
+        # Mettre à jour les limites de température depuis la config de l'appareil
+        if device_info:
+            self._attr_min_temp = device_info.get("min_temp", MIN_TEMP)
+            self._attr_max_temp = device_info.get("max_temp", MAX_TEMP)
 
     @property
     def current_temperature(self) -> float | None:
@@ -92,8 +83,9 @@ class ACITThermaControlClimate(CoordinatorEntity, ClimateEntity):
     @property
     def hvac_mode(self) -> HVACMode:
         """Retourner le mode HVAC actuel."""
-        mode = self.coordinator.data.get("hvac_mode", "off")
-        return HVAC_MODE_MAP.get(mode, HVACMode.OFF)
+        # Pour v2.0, mode simplifié basé sur heater_level
+        heater_level = self.coordinator.data.get("heater_level", 0)
+        return HVACMode.HEAT if heater_level > 0 else HVACMode.HEAT
 
     @property
     def available(self) -> bool:
@@ -110,18 +102,18 @@ class ACITThermaControlClimate(CoordinatorEntity, ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Définir le mode HVAC."""
-        mode = HVAC_MODE_REVERSE_MAP.get(hvac_mode, "off")
-        _LOGGER.debug(f"Définition du mode HVAC: {mode}")
-        await self.coordinator.async_set_hvac_mode(mode)
+        # Pour v2.0, le mode est toujours HEAT (contrôlé automatiquement par l'appareil)
+        _LOGGER.debug(f"Mode HVAC: {hvac_mode} (géré automatiquement par l'appareil)")
 
     @property
     def icon(self) -> str:
         """Retourner l'icône de l'entité."""
-        if self.hvac_mode == HVACMode.HEAT:
-            return "mdi:radiator"
-        elif self.hvac_mode == HVACMode.COOL:
-            return "mdi:snowflake"
-        elif self.hvac_mode == HVACMode.AUTO:
-            return "mdi:thermostat-auto"
         return "mdi:thermostat"
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Retourner les attributs d'état supplémentaires."""
+        return {
+            "heater_level": self.coordinator.data.get("heater_level"),
+            "fan_speed": self.coordinator.data.get("fan_speed"),
+        }

@@ -7,29 +7,31 @@ import logging
 from datetime import timedelta
 from typing import Any
 
-import paho.mqtt.client as mqtt
+import aiohttp
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
     DOMAIN,
-    TOPIC_AVAILABILITY,
-    TOPIC_HVAC_MODE,
-    TOPIC_SET_HVAC_MODE,
-    TOPIC_SET_TARGET_TEMPERATURE,
-    TOPIC_TARGET_TEMPERATURE,
-    TOPIC_TEMPERATURE,
+    RPC_ENDPOINT,
+    RPC_METHOD_GET_CONFIG,
+    RPC_METHOD_GET_STATUS,
+    RPC_METHOD_SET_TARGET_TEMP,
+    RPC_TIMEOUT,
     UPDATE_INTERVAL,
+    WS_ENDPOINT,
+    WS_NOTIFY_STATUS,
+    WS_RECONNECT_DELAY,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class ACITThermaControlCoordinator(DataUpdateCoordinator):
-    """Coordinateur pour gérer les données ACIT ThermACEC via MQTT."""
+    """Coordinateur pour gérer les données ACIT ThermACEC via HTTP RPC + WebSocket."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialiser le coordinateur."""
@@ -40,127 +42,242 @@ class ACITThermaControlCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=UPDATE_INTERVAL),
         )
         self.entry = entry
-        self.mqtt_client: mqtt.Client | None = None
-        self._topic_prefix = entry.data.get("topic_prefix", "acit/thermacec")
-        
+        self._host = entry.data[CONF_HOST]
+        self._port = entry.data.get(CONF_PORT, 80)
+        self._rpc_id = 1
+
+        # Session HTTP
+        self._session: aiohttp.ClientSession | None = None
+
+        # WebSocket
+        self._ws: aiohttp.ClientWebSocketResponse | None = None
+        self._ws_task: asyncio.Task | None = None
+        self._ws_connected = False
+
+        # Device info
+        self._device_info: dict[str, Any] = {}
+
         # Données de l'appareil
         self.data: dict[str, Any] = {
             "temperature": None,
             "target_temperature": None,
-            "hvac_mode": "off",
+            "heater_level": None,
+            "fan_speed": None,
             "available": False,
         }
 
+    @property
+    def device_info(self) -> dict[str, Any]:
+        """Retourner les informations de l'appareil."""
+        return self._device_info
+
     async def async_config_entry_first_refresh(self) -> None:
         """Première actualisation lors de la configuration."""
-        await self._async_setup_mqtt()
+        # Créer la session HTTP
+        self._session = aiohttp.ClientSession()
+
+        # Récupérer la configuration de l'appareil
+        await self._async_get_device_config()
+
+        # Démarrer le WebSocket
+        self._ws_task = self.hass.async_create_task(self._async_websocket_loop())
+
+        # Première actualisation des données
         await super().async_config_entry_first_refresh()
 
-    async def _async_setup_mqtt(self) -> None:
-        """Configurer la connexion MQTT."""
-        _LOGGER.debug("Configuration de la connexion MQTT")
-        
-        def on_connect(client, userdata, flags, rc):
-            """Callback appelé lors de la connexion au broker MQTT."""
-            if rc == 0:
-                _LOGGER.info("Connecté au broker MQTT")
-                # S'abonner aux topics
-                topics = [
-                    f"{self._topic_prefix}/{TOPIC_TEMPERATURE}",
-                    f"{self._topic_prefix}/{TOPIC_TARGET_TEMPERATURE}",
-                    f"{self._topic_prefix}/{TOPIC_HVAC_MODE}",
-                    f"{self._topic_prefix}/{TOPIC_AVAILABILITY}",
-                ]
-                for topic in topics:
-                    client.subscribe(topic)
-                    _LOGGER.debug(f"Abonné au topic: {topic}")
-            else:
-                _LOGGER.error(f"Échec de connexion MQTT, code: {rc}")
+    async def _async_rpc_call(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Effectuer un appel RPC."""
+        if self._session is None:
+            raise UpdateFailed("Session HTTP non initialisée")
 
-        def on_message(client, userdata, msg):
-            """Callback appelé lors de la réception d'un message MQTT."""
-            topic = msg.topic.replace(f"{self._topic_prefix}/", "")
-            payload = msg.payload.decode()
-            
-            _LOGGER.debug(f"Message reçu - Topic: {topic}, Payload: {payload}")
-            
-            # Mettre à jour les données
-            if topic == TOPIC_TEMPERATURE:
-                try:
-                    self.data["temperature"] = float(payload)
-                except ValueError:
-                    _LOGGER.error(f"Valeur de température invalide: {payload}")
-            elif topic == TOPIC_TARGET_TEMPERATURE:
-                try:
-                    self.data["target_temperature"] = float(payload)
-                except ValueError:
-                    _LOGGER.error(f"Valeur de consigne invalide: {payload}")
-            elif topic == TOPIC_HVAC_MODE:
-                self.data["hvac_mode"] = payload
-            elif topic == TOPIC_AVAILABILITY:
-                self.data["available"] = payload.lower() == "online"
-            
-            # Notifier les entités
-            self.async_set_updated_data(self.data)
+        url = f"http://{self._host}:{self._port}{RPC_ENDPOINT}"
+        payload = {
+            "jsonrpc": "2.0",
+            "id": self._rpc_id,
+            "method": method,
+            "params": params or {},
+        }
+        self._rpc_id += 1
 
-        # Créer le client MQTT
-        self.mqtt_client = mqtt.Client()
-        self.mqtt_client.on_connect = on_connect
-        self.mqtt_client.on_message = on_message
-        
-        # Authentification si nécessaire
-        username = self.entry.data.get(CONF_USERNAME)
-        password = self.entry.data.get(CONF_PASSWORD)
-        if username and password:
-            self.mqtt_client.username_pw_set(username, password)
-        
-        # Connexion au broker
-        host = self.entry.data[CONF_HOST]
-        port = self.entry.data[CONF_PORT]
-        
+        _LOGGER.debug(f"Appel RPC: {method} - {params}")
+
         try:
-            await self.hass.async_add_executor_job(
-                self.mqtt_client.connect, host, port, 60
-            )
-            await self.hass.async_add_executor_job(self.mqtt_client.loop_start)
-            _LOGGER.info(f"Client MQTT démarré - {host}:{port}")
-        except Exception as err:
-            _LOGGER.error(f"Erreur de connexion MQTT: {err}")
-            raise UpdateFailed(f"Erreur de connexion MQTT: {err}")
+            async with self._session.post(
+                url,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=RPC_TIMEOUT),
+            ) as response:
+                if response.status != 200:
+                    raise UpdateFailed(f"Erreur HTTP {response.status}")
+
+                result = await response.json()
+
+                if "error" in result:
+                    error = result["error"]
+                    raise UpdateFailed(f"Erreur RPC: {error.get('message', 'Unknown error')}")
+
+                _LOGGER.debug(f"Réponse RPC: {result.get('result')}")
+                return result.get("result", {})
+
+        except asyncio.TimeoutError as err:
+            raise UpdateFailed(f"Timeout lors de l'appel RPC: {method}") from err
+        except aiohttp.ClientError as err:
+            raise UpdateFailed(f"Erreur de connexion: {err}") from err
+
+    async def _async_get_device_config(self) -> None:
+        """Récupérer la configuration de l'appareil."""
+        try:
+            config = await self._async_rpc_call(RPC_METHOD_GET_CONFIG)
+            self._device_info = {
+                "model": config.get("model", "ThermACEC"),
+                "version": config.get("version", "Unknown"),
+                "manufacturer": config.get("manufacturer", "ACIT"),
+                "mac_address": config.get("mac_address", ""),
+                "min_temp": config.get("min_temp", 5),
+                "max_temp": config.get("max_temp", 35),
+                "features": config.get("features", []),
+            }
+            _LOGGER.info(f"Configuration appareil: {self._device_info}")
+        except UpdateFailed as err:
+            _LOGGER.error(f"Erreur lors de la récupération de la configuration: {err}")
+            # Utiliser des valeurs par défaut
+            self._device_info = {
+                "model": "ThermACEC",
+                "version": "Unknown",
+                "manufacturer": "ACIT",
+                "mac_address": "",
+                "min_temp": 5,
+                "max_temp": 35,
+                "features": [],
+            }
+
+    async def _async_websocket_loop(self) -> None:
+        """Boucle de connexion WebSocket."""
+        while True:
+            try:
+                await self._async_connect_websocket()
+            except asyncio.CancelledError:
+                _LOGGER.debug("Tâche WebSocket annulée")
+                break
+            except Exception as err:
+                _LOGGER.error(f"Erreur WebSocket: {err}")
+                self._ws_connected = False
+                self.data["available"] = False
+                self.async_set_updated_data(self.data)
+
+            # Attendre avant de reconnecter
+            _LOGGER.info(f"Reconnexion WebSocket dans {WS_RECONNECT_DELAY}s...")
+            await asyncio.sleep(WS_RECONNECT_DELAY)
+
+    async def _async_connect_websocket(self) -> None:
+        """Se connecter au WebSocket."""
+        if self._session is None:
+            return
+
+        url = f"ws://{self._host}:{self._port}{WS_ENDPOINT}"
+        _LOGGER.info(f"Connexion WebSocket à {url}")
+
+        try:
+            async with self._session.ws_connect(url) as ws:
+                self._ws = ws
+                self._ws_connected = True
+                self.data["available"] = True
+                self.async_set_updated_data(self.data)
+
+                _LOGGER.info("WebSocket connecté")
+
+                # Écouter les messages
+                async for msg in ws:
+                    if msg.type == aiohttp.WSMsgType.TEXT:
+                        await self._async_handle_ws_message(msg.data)
+                    elif msg.type == aiohttp.WSMsgType.ERROR:
+                        _LOGGER.error(f"Erreur WebSocket: {ws.exception()}")
+                        break
+                    elif msg.type == aiohttp.WSMsgType.CLOSED:
+                        _LOGGER.warning("WebSocket fermé")
+                        break
+
+        except aiohttp.ClientError as err:
+            _LOGGER.error(f"Erreur de connexion WebSocket: {err}")
+            raise
+        finally:
+            self._ws = None
+            self._ws_connected = False
+
+    async def _async_handle_ws_message(self, message: str) -> None:
+        """Traiter un message WebSocket."""
+        try:
+            data = json.loads(message)
+
+            # Vérifier si c'est une notification
+            if data.get("method") == WS_NOTIFY_STATUS:
+                params = data.get("params", {})
+                _LOGGER.debug(f"Notification reçue: {params}")
+
+                # Mettre à jour les données
+                self.data["temperature"] = params.get("temperature")
+                self.data["target_temperature"] = params.get("target_temperature")
+                self.data["heater_level"] = params.get("heater_level")
+                self.data["fan_speed"] = params.get("fan_speed")
+                self.data["available"] = True
+
+                # Notifier les entités
+                self.async_set_updated_data(self.data)
+
+        except json.JSONDecodeError as err:
+            _LOGGER.error(f"Erreur de décodage JSON: {err}")
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Mettre à jour les données."""
-        # Les données sont mises à jour via les callbacks MQTT
-        return self.data
+        """Mettre à jour les données via RPC (fallback si WebSocket échoue)."""
+        if self._ws_connected:
+            # Si WebSocket est connecté, les données sont mises à jour automatiquement
+            return self.data
 
-    async def async_publish(self, topic: str, payload: str | float) -> None:
-        """Publier un message MQTT."""
-        if self.mqtt_client is None:
-            _LOGGER.error("Client MQTT non initialisé")
-            return
-        
-        full_topic = f"{self._topic_prefix}/{topic}"
-        _LOGGER.debug(f"Publication MQTT - Topic: {full_topic}, Payload: {payload}")
-        
+        # Sinon, récupérer les données via RPC
         try:
-            await self.hass.async_add_executor_job(
-                self.mqtt_client.publish, full_topic, str(payload)
-            )
-        except Exception as err:
-            _LOGGER.error(f"Erreur lors de la publication MQTT: {err}")
+            status = await self._async_rpc_call(RPC_METHOD_GET_STATUS)
+
+            self.data["temperature"] = status.get("temperature")
+            self.data["target_temperature"] = status.get("target_temperature")
+            self.data["heater_level"] = status.get("heater_level")
+            self.data["fan_speed"] = status.get("fan_speed")
+            self.data["available"] = True
+
+            return self.data
+
+        except UpdateFailed as err:
+            _LOGGER.error(f"Erreur lors de la mise à jour: {err}")
+            self.data["available"] = False
+            return self.data
 
     async def async_set_target_temperature(self, temperature: float) -> None:
-        """Définir la température cible."""
-        await self.async_publish(TOPIC_SET_TARGET_TEMPERATURE, temperature)
-
-    async def async_set_hvac_mode(self, mode: str) -> None:
-        """Définir le mode HVAC."""
-        await self.async_publish(TOPIC_SET_HVAC_MODE, mode)
+        """Définir la température cible via RPC."""
+        try:
+            await self._async_rpc_call(
+                RPC_METHOD_SET_TARGET_TEMP,
+                {"temperature": temperature}
+            )
+            _LOGGER.info(f"Consigne définie à {temperature}°C")
+        except UpdateFailed as err:
+            _LOGGER.error(f"Erreur lors du changement de consigne: {err}")
+            raise
 
     async def async_shutdown(self) -> None:
         """Arrêter le coordinateur."""
-        if self.mqtt_client:
-            _LOGGER.debug("Arrêt du client MQTT")
-            await self.hass.async_add_executor_job(self.mqtt_client.loop_stop)
-            await self.hass.async_add_executor_job(self.mqtt_client.disconnect)
+        _LOGGER.debug("Arrêt du coordinateur")
 
+        # Arrêter la tâche WebSocket
+        if self._ws_task:
+            self._ws_task.cancel()
+            try:
+                await self._ws_task
+            except asyncio.CancelledError:
+                pass
+
+        # Fermer le WebSocket
+        if self._ws and not self._ws.closed:
+            await self._ws.close()
+
+        # Fermer la session HTTP
+        if self._session and not self._session.closed:
+            await self._session.close()
