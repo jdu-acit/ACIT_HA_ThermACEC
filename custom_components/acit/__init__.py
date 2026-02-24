@@ -40,7 +40,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         manufacturer=device_info.get("manufacturer", "ACIT"),
         name=entry.data.get("device_name", "ACIT ThermACEC"),
         model=device_info.get("model", "ThermACEC"),
-        sw_version=device_info.get("version", "Unknown"),
+        sw_version=device_info.get("version", "Non disponible"),
     )
 
     # Configurer les plateformes
