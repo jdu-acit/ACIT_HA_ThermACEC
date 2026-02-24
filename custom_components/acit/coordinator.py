@@ -56,6 +56,10 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
         # Device info
         self._device_info: dict[str, Any] = {}
 
+        # Compteur d'erreurs consécutives
+        self._consecutive_errors = 0
+        self._max_consecutive_errors = 3  # Nombre d'erreurs avant de marquer indisponible
+
         # Données de l'appareil
         self.data: dict[str, Any] = {
             "temperature": None,
@@ -140,9 +144,20 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
         """Récupérer la configuration de l'appareil."""
         try:
             config = await self._async_rpc_call(RPC_METHOD_GET_CONFIG)
+
+            # Log de la réponse brute pour debug
+            _LOGGER.info(f"Réponse brute Thermostat.GetConfig: {config}")
+
+            # Vérifier si la version est présente
+            version = config.get("version")
+            if version:
+                _LOGGER.info(f"✅ Version firmware reçue: {version}")
+            else:
+                _LOGGER.warning(f"⚠️ Aucune version firmware dans la réponse! Réponse complète: {config}")
+
             self._device_info = {
                 "model": config.get("model", "ThermACEC"),
-                "version": config.get("version", "Unknown"),
+                "version": config.get("version", "Non disponible"),
                 "manufacturer": config.get("manufacturer", "ACIT"),
                 "mac_address": config.get("mac_address", ""),
                 "min_temp": config.get("min_temp", 5),
@@ -155,7 +170,7 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
             # Utiliser des valeurs par défaut
             self._device_info = {
                 "model": "ThermACEC",
-                "version": "Unknown",
+                "version": "Non disponible",
                 "manufacturer": "ACIT",
                 "mac_address": "",
                 "min_temp": 5,
