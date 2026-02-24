@@ -81,7 +81,14 @@ class ACITUpdateEntity(CoordinatorEntity, UpdateEntity):
     def latest_version(self) -> str | None:
         """Dernière version disponible."""
         ota_data = self.coordinator.data.get("ota", {})
-        return ota_data.get("available_version")
+        available_version = ota_data.get("available_version")
+
+        # Si aucune mise à jour n'est disponible, retourner la version actuelle
+        # pour que l'état de l'entité soit "off" au lieu de "unknown"
+        if not available_version:
+            return self.installed_version
+
+        return available_version
 
     @property
     def release_summary(self) -> str | None:
