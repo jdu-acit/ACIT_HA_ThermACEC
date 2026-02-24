@@ -60,7 +60,7 @@ class ACITUpdateEntity(CoordinatorEntity, UpdateEntity):
             "name": entry.data.get("device_name", "ACIT ThermACEC"),
             "manufacturer": device_info.get("manufacturer", "ACIT"),
             "model": device_info.get("model", "ThermACEC"),
-            "sw_version": device_info.get("version", "Unknown"),
+            "sw_version": device_info.get("version", "Non disponible"),
         }
 
     @property
