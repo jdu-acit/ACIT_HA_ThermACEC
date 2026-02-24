@@ -68,7 +68,6 @@ SENSORS: tuple[ACITSensorEntityDescription, ...] = (
     ACITSensorEntityDescription(
         key="heater_level",
         translation_key="heater_level",
-        native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         exists_fn=lambda data: data.get("heater_level") is not None,
@@ -78,7 +77,6 @@ SENSORS: tuple[ACITSensorEntityDescription, ...] = (
     ACITSensorEntityDescription(
         key="fan_speed",
         translation_key="fan_speed",
-        native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         exists_fn=lambda data: data.get("fan_speed") is not None,
