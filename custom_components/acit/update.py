@@ -72,7 +72,7 @@ class ACITUpdateEntity(CoordinatorEntity, UpdateEntity):
 
         # Retourner None si pas de version valide (Home Assistant affichera "unknown")
         if not version or version == "Non disponible":
-            _LOGGER.warning(f"Aucune version firmware valide trouvée dans device_info")
+            _LOGGER.warning("Aucune version firmware valide trouvée dans device_info")
             return None
 
         return version
