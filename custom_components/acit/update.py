@@ -66,7 +66,16 @@ class ACITUpdateEntity(CoordinatorEntity, UpdateEntity):
     @property
     def installed_version(self) -> str | None:
         """Version actuellement installée."""
-        return self.coordinator.device_info.get("version")
+        version = self.coordinator.device_info.get("version")
+        _LOGGER.debug(f"Update entity - installed_version appelé, version = {version}")
+        _LOGGER.debug(f"Update entity - device_info complet = {self.coordinator.device_info}")
+
+        # Retourner None si pas de version valide (Home Assistant affichera "unknown")
+        if not version or version == "Non disponible":
+            _LOGGER.warning(f"Aucune version firmware valide trouvée dans device_info")
+            return None
+
+        return version
 
     @property
     def latest_version(self) -> str | None:
