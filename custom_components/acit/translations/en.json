@@ -79,5 +79,17 @@
         "name": "Firmware"
       }
     }
+  },
+  "services": {
+    "check_update": {
+      "name": "Check for updates",
+      "description": "Manually check whether an OTA update is available",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The ACIT device to check"
+        }
+      }
+    }
   }
 }
