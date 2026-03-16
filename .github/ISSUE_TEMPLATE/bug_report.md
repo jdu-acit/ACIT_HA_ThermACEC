@@ -1,56 +1,56 @@
 ---
 name: Bug Report
-about: Signaler un bug ou un problème
+about: Report a bug or an issue
 title: '[BUG] '
 labels: bug
 assignees: ''
 ---
 
-## 🐛 Description du bug
+## 🐛 Bug description
 
-Une description claire et concise du bug.
+A clear and concise description of the bug.
 
-## 📋 Étapes pour reproduire
+## 📋 Steps to reproduce
 
-1. Aller à '...'
-2. Cliquer sur '...'
-3. Faire défiler jusqu'à '...'
-4. Voir l'erreur
+1. Go to '...'
+2. Click on '...'
+3. Scroll down to '...'
+4. See the error
 
-## ✅ Comportement attendu
+## ✅ Expected behavior
 
-Une description claire de ce qui devrait se passer.
+A clear description of what should happen.
 
-## ❌ Comportement actuel
+## ❌ Actual behavior
 
-Une description claire de ce qui se passe actuellement.
+A clear description of what currently happens.
 
-## 📸 Captures d'écran
+## 📸 Screenshots
 
-Si applicable, ajoutez des captures d'écran pour illustrer le problème.
+If applicable, add screenshots to illustrate the problem.
 
-## 🔧 Environnement
+## 🔧 Environment
 
-- **Version Home Assistant** : [ex: 2024.1.0]
-- **Version de l'intégration** : [ex: 1.0.0]
-- **Type d'installation** : [HACS / Manuel]
-- **Broker MQTT** : [Mosquitto / Autre]
-- **Version du broker** : [ex: 2.0.15]
+- **Home Assistant version**: [e.g. 2024.1.0]
+- **Integration version**: [e.g. 1.0.0]
+- **Installation type**: [HACS / Manual]
+- **MQTT broker**: [Mosquitto / Other]
+- **Broker version**: [e.g. 2.0.15]
 
 ## 📝 Configuration
 
 ```yaml
-# Votre configuration (masquez les informations sensibles)
+# Your configuration (mask any sensitive information)
 ```
 
 ## 📊 Logs
 
 ```
-# Logs pertinents de Home Assistant
-# Paramètres → Système → Journaux
+# Relevant Home Assistant logs
+# Settings → System → Logs
 ```
 
-## ℹ️ Informations supplémentaires
+## ℹ️ Additional information
 
-Toute autre information utile pour résoudre le problème.
+Any other information useful to resolve the issue.
 

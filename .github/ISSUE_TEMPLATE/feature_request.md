@@ -1,36 +1,36 @@
 ---
 name: Feature Request
-about: Proposer une nouvelle fonctionnalité
+about: Propose a new feature
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''
 ---
 
-## 🚀 Fonctionnalité proposée
+## 🚀 Proposed feature
 
-Une description claire et concise de la fonctionnalité souhaitée.
+A clear and concise description of the desired feature.
 
 ## 💡 Motivation
 
-Pourquoi cette fonctionnalité serait-elle utile ?
+Why would this feature be useful?
 
-**Problème actuel :**
-Décrivez le problème que cette fonctionnalité résoudrait.
+**Current problem:**
+Describe the problem this feature would solve.
 
-**Solution proposée :**
-Décrivez comment vous imaginez cette fonctionnalité.
+**Proposed solution:**
+Describe how you envision this feature.
 
-## 📝 Exemple d'utilisation
+## 📝 Usage example
 
 ```yaml
-# Exemple de configuration ou d'utilisation
+# Example configuration or usage
 ```
 
-## 🎨 Alternatives considérées
+## 🎨 Alternatives considered
 
-Avez-vous envisagé d'autres solutions ? Lesquelles ?
+Have you considered other solutions? Which ones?
 
-## ℹ️ Informations supplémentaires
+## ℹ️ Additional information
 
-Toute autre information ou contexte utile.
+Any other useful information or context.
 

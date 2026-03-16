@@ -1,42 +1,42 @@
 # Description
 
-Décrivez les changements apportés par cette PR.
+Describe the changes introduced by this PR.
 
-## Type de changement
+## Type of change
 
-- [ ] 🐛 Bug fix (changement non-breaking qui corrige un problème)
-- [ ] ✨ Nouvelle fonctionnalité (changement non-breaking qui ajoute une fonctionnalité)
-- [ ] 💥 Breaking change (correction ou fonctionnalité qui causerait un dysfonctionnement des fonctionnalités existantes)
-- [ ] 📝 Documentation (changements de documentation uniquement)
+- [ ] 🐛 Bug fix (non-breaking change that fixes an issue)
+- [ ] ✨ New feature (non-breaking change that adds functionality)
+- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to break)
+- [ ] 📝 Documentation (documentation changes only)
 
 ## Checklist
 
-- [ ] Mon code suit les conventions de style du projet
-- [ ] J'ai effectué une auto-review de mon code
-- [ ] J'ai commenté mon code, particulièrement dans les zones difficiles à comprendre
-- [ ] J'ai mis à jour la documentation si nécessaire
-- [ ] Mes changements ne génèrent pas de nouveaux warnings
-- [ ] J'ai testé mes changements localement
-- [ ] J'ai mis à jour le CHANGELOG.md
+- [ ] My code follows the project's style conventions
+- [ ] I have performed a self-review of my code
+- [ ] I have commented my code, particularly in hard-to-understand areas
+- [ ] I have updated the documentation if necessary
+- [ ] My changes do not generate new warnings
+- [ ] I have tested my changes locally
+- [ ] I have updated CHANGELOG.md
 
-## Tests effectués
+## Tests performed
 
-Décrivez les tests que vous avez effectués pour vérifier vos changements.
+Describe the tests you ran to verify your changes.
 
 - [ ] Test A
 - [ ] Test B
 
-## Environnement de test
+## Test environment
 
-- Version Home Assistant : 
-- Version Python : 
-- Broker MQTT : 
+- Home Assistant version:
+- Python version:
+- MQTT broker:
 
-## Captures d'écran (si applicable)
+## Screenshots (if applicable)
 
-Ajoutez des captures d'écran pour illustrer les changements.
+Add screenshots to illustrate the changes.
 
-## Notes supplémentaires
+## Additional notes
 
-Toute information supplémentaire utile pour les reviewers.
+Any additional information useful for reviewers.
 
