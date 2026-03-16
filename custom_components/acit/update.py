@@ -1,4 +1,4 @@
-"""Entité Update pour ACIT ThermACEC - Mises à jour OTA."""
+"""Update entity for ACIT ThermACEC - OTA updates."""
 from __future__ import annotations
 
 import logging
@@ -25,15 +25,15 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Configurer l'entité update ACIT."""
+    """Set up the ACIT update entity."""
     coordinator: ACITThermACECCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    # Tous les appareils ACIT supportent l'OTA
+    # All ACIT devices support OTA
     async_add_entities([ACITUpdateEntity(coordinator, entry)])
 
 
 class ACITUpdateEntity(CoordinatorEntity, UpdateEntity):
-    """Entité Update pour ACIT ThermACEC - Gestion OTA."""
+    """Update entity for ACIT ThermACEC - OTA management."""
 
     _attr_device_class = UpdateDeviceClass.FIRMWARE
     _attr_supported_features = (
@@ -49,7 +49,7 @@ class ACITUpdateEntity(CoordinatorEntity, UpdateEntity):
         coordinator: ACITThermACECCoordinator,
         entry: ConfigEntry,
     ) -> None:
-        """Initialiser l'entité update."""
+        """Initialize the update entity."""
         super().__init__(coordinator)
         device_info = coordinator.device_info
         mac_address = device_info.get("mac_address", entry.entry_id)
@@ -60,31 +60,31 @@ class ACITUpdateEntity(CoordinatorEntity, UpdateEntity):
             "name": entry.data.get("device_name", "ACIT ThermACEC"),
             "manufacturer": device_info.get("manufacturer", "ACIT"),
             "model": device_info.get("model", "ThermACEC"),
-            "sw_version": device_info.get("version", "Non disponible"),
+            "sw_version": device_info.get("version", "Unavailable"),
         }
 
     @property
     def installed_version(self) -> str | None:
-        """Version actuellement installée."""
+        """Currently installed version."""
         version = self.coordinator.device_info.get("version")
-        _LOGGER.debug(f"Update entity - installed_version appelé, version = {version}")
-        _LOGGER.debug(f"Update entity - device_info complet = {self.coordinator.device_info}")
+        _LOGGER.debug(f"Update entity - installed_version called, version = {version}")
+        _LOGGER.debug(f"Update entity - full device_info = {self.coordinator.device_info}")
 
-        # Retourner None si pas de version valide (Home Assistant affichera "unknown")
-        if not version or version == "Non disponible":
-            _LOGGER.warning("Aucune version firmware valide trouvée dans device_info")
+        # Return None if no valid version (Home Assistant will show "unknown")
+        if not version or version == "Unavailable":
+            _LOGGER.warning("No valid firmware version found in device_info")
             return None
 
         return version
 
     @property
     def latest_version(self) -> str | None:
-        """Dernière version disponible."""
+        """Latest available version."""
         ota_data = self.coordinator.data.get("ota", {})
         available_version = ota_data.get("available_version")
 
-        # Si aucune mise à jour n'est disponible, retourner la version actuelle
-        # pour que l'état de l'entité soit "off" au lieu de "unknown"
+        # If no update is available, return the current version
+        # so the entity state is "off" instead of "unknown"
         if not available_version:
             return self.installed_version
 
@@ -92,73 +92,73 @@ class ACITUpdateEntity(CoordinatorEntity, UpdateEntity):
 
     @property
     def release_summary(self) -> str | None:
-        """Résumé de la release."""
+        """Release summary."""
         ota_data = self.coordinator.data.get("ota", {})
         if ota_data.get("update_available"):
             channel = ota_data.get("channel", "stable")
-            return f"Nouvelle version disponible sur le canal {channel}"
+            return f"New version available on the {channel} channel"
         return None
 
     @property
     def release_url(self) -> str | None:
-        """URL vers les notes de version complètes."""
+        """URL to the full release notes."""
         ota_data = self.coordinator.data.get("ota", {})
         return ota_data.get("release_url")
 
     @property
     def in_progress(self) -> bool | None:
-        """Mise à jour en cours."""
+        """Whether an update is in progress."""
         ota_data = self.coordinator.data.get("ota", {})
         state = ota_data.get("state", "idle")
         return state in ["checking", "downloading", "applying"]
 
     @property
     def update_percentage(self) -> int | None:
-        """Progression de la mise à jour (0-100%)."""
+        """Update progress (0-100%)."""
         ota_data = self.coordinator.data.get("ota", {})
         return ota_data.get("progress")
 
     async def async_install(
         self, version: str | None, backup: bool, **kwargs: Any
     ) -> None:
-        """Installer une mise à jour OTA."""
+        """Install an OTA update."""
         _LOGGER.info(
-            "Démarrage de la mise à jour OTA vers la version %s",
+            "Starting OTA update to version %s",
             version or "latest"
         )
 
         try:
-            # Appeler la méthode RPC System.StartOTA
+            # Call the System.StartOTA RPC method
             await self.coordinator.call_rpc("System.StartOTA", {})
 
-            # Rafraîchir les données pour obtenir l'état
+            # Refresh data to get the current state
             await self.coordinator.async_request_refresh()
 
         except Exception as err:
-            _LOGGER.error("Erreur lors du démarrage de l'OTA: %s", err)
+            _LOGGER.error("Error starting OTA update: %s", err)
             raise
 
     async def async_release_notes(self) -> str | None:
-        """Retourner les notes de version complètes."""
+        """Return the full release notes."""
         ota_data = self.coordinator.data.get("ota", {})
 
         notes = []
         notes.append(f"## Version {self.latest_version}\n")
 
         if channel := ota_data.get("channel"):
-            notes.append(f"**Canal:** {channel}\n")
+            notes.append(f"**Channel:** {channel}\n")
 
         if size := ota_data.get("size"):
             size_mb = size / (1024 * 1024)
-            notes.append(f"**Taille:** {size_mb:.2f} MB\n")
+            notes.append(f"**Size:** {size_mb:.2f} MB\n")
 
         if mandatory := ota_data.get("mandatory"):
             if mandatory:
-                notes.append("⚠️ **Mise à jour obligatoire**\n")
+                notes.append("⚠️ **Mandatory update**\n")
 
         notes.append("\n---\n")
-        notes.append("La mise à jour sera téléchargée et installée automatiquement.")
-        notes.append("\nL'appareil redémarrera après l'installation.")
+        notes.append("The update will be downloaded and installed automatically.")
+        notes.append("\nThe device will restart after installation.")
 
         return "\n".join(notes)
 

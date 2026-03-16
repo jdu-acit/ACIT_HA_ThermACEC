@@ -1,4 +1,4 @@
-"""Config flow pour ACIT ThermaControl."""
+"""Config flow for ACIT ThermaControl."""
 from __future__ import annotations
 
 import asyncio
@@ -34,7 +34,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
-    """Valider les données saisies par l'utilisateur en testant la connexion RPC."""
+    """Validate user input by testing the RPC connection."""
     host = data[CONF_HOST]
     port = data.get(CONF_PORT, DEFAULT_PORT)
 
@@ -72,48 +72,48 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
                 }
 
     except asyncio.TimeoutError as err:
-        raise ValueError("Timeout lors de la connexion") from err
+        raise ValueError("Connection timeout") from err
     except aiohttp.ClientError as err:
-        raise ValueError(f"Erreur de connexion: {err}") from err
+        raise ValueError(f"Connection error: {err}") from err
 
 
 class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Gérer le flux de configuration pour ACIT ThermaControl."""
+    """Handle the config flow for ACIT ThermaControl."""
 
     VERSION = 2
 
     def __init__(self) -> None:
-        """Initialiser le flux de configuration."""
+        """Initialize the config flow."""
         self._discovered_devices: dict[str, dict[str, Any]] = {}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Gérer l'étape initiée par l'utilisateur."""
+        """Handle the user-initiated step."""
         return await self.async_step_manual()
 
     async def async_step_manual(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Configuration manuelle par IP."""
+        """Manual configuration by IP address."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
             try:
                 info = await validate_input(self.hass, user_input)
             except ValueError as err:
-                _LOGGER.error(f"Erreur de validation: {err}")
+                _LOGGER.error(f"Validation error: {err}")
                 errors["base"] = "cannot_connect"
             except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Erreur inattendue lors de la validation")
+                _LOGGER.exception("Unexpected error during validation")
                 errors["base"] = "unknown"
             else:
-                # Utiliser l'adresse MAC comme unique_id
+                # Use MAC address as unique_id
                 mac_address = info.get("mac_address", user_input[CONF_HOST])
                 await self.async_set_unique_id(mac_address)
                 self._abort_if_unique_id_configured()
 
-                # Ajouter device_name aux données
+                # Add device_name to data
                 user_input["device_name"] = user_input[CONF_NAME]
 
                 return self.async_create_entry(title=info["title"], data=user_input)
@@ -132,17 +132,17 @@ class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_zeroconf(
         self, discovery_info: zeroconf.ZeroconfServiceInfo
     ) -> FlowResult:
-        """Gérer la découverte via Zeroconf/mDNS."""
-        _LOGGER.info(f"Appareil ACIT découvert via mDNS: {discovery_info}")
+        """Handle Zeroconf/mDNS discovery."""
+        _LOGGER.info(f"ACIT device discovered via mDNS: {discovery_info}")
 
         host = discovery_info.host
         port = discovery_info.port or DEFAULT_PORT
         hostname = discovery_info.hostname
 
-        # Extraire le nom de l'appareil depuis le hostname
+        # Extract device name from hostname
         device_name = hostname.replace(".local.", "").replace("_", " ").title()
 
-        # Tester la connexion et récupérer la config
+        # Test connection and retrieve config
         try:
             info = await validate_input(
                 self.hass,
@@ -153,15 +153,15 @@ class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 },
             )
         except Exception as err:
-            _LOGGER.error(f"Erreur lors de la validation de l'appareil découvert: {err}")
+            _LOGGER.error(f"Error validating discovered device: {err}")
             return self.async_abort(reason="cannot_connect")
 
-        # Utiliser l'adresse MAC comme unique_id
+        # Use MAC address as unique_id
         mac_address = info.get("mac_address", host)
         await self.async_set_unique_id(mac_address)
         self._abort_if_unique_id_configured()
 
-        # Stocker les informations découvertes
+        # Store discovered device information
         self.context["title_placeholders"] = {"name": device_name}
         self._discovered_devices[mac_address] = {
             CONF_NAME: device_name,
@@ -177,7 +177,7 @@ class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_discovery_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Confirmer la découverte."""
+        """Confirm discovery."""
         mac_address = self.unique_id
         discovered = self._discovered_devices.get(mac_address, {})
 

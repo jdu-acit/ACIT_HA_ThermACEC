@@ -1,10 +1,10 @@
-"""Constantes pour l'intégration ACIT ThermACEC."""
+"""Constants for the ACIT ThermACEC integration."""
 from typing import Final
 
-# Domaine de l'intégration
+# Integration domain
 DOMAIN: Final = "acit"
 
-# Configuration par défaut
+# Default configuration
 DEFAULT_NAME: Final = "ACIT ThermACEC"
 DEFAULT_PORT: Final = 80
 DEFAULT_SCAN_INTERVAL: Final = 30
@@ -37,7 +37,7 @@ RPC_METHOD_GET_OTA_STATUS: Final = "System.GetOTAStatus"
 # WebSocket Notifications
 WS_NOTIFY_STATUS: Final = "NotifyStatus"
 
-# Limites de température
+# Temperature limits
 MIN_TEMP: Final = 5.0
 MAX_TEMP: Final = 35.0
 TEMP_STEP: Final = 0.1
@@ -48,8 +48,8 @@ HVAC_MODE_HEAT: Final = "heat"
 HVAC_MODE_COOL: Final = "cool"
 HVAC_MODE_AUTO: Final = "auto"
 
-# Intervalle de mise à jour (secondes) - utilisé comme fallback si WebSocket échoue
+# Update interval (seconds) - used as fallback if WebSocket fails
 UPDATE_INTERVAL: Final = 30
 
-# Timeout de disponibilité (secondes)
+# Availability timeout (seconds)
 AVAILABILITY_TIMEOUT: Final = 60

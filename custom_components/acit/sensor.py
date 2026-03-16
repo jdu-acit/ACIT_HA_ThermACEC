@@ -1,4 +1,4 @@
-"""Capteurs pour ACIT ThermACEC."""
+"""Sensors for ACIT ThermACEC."""
 from __future__ import annotations
 
 import logging
@@ -40,9 +40,9 @@ class ACITSensorEntityDescription(SensorEntityDescription):
     required_feature: ACITFeature | None = None
 
 
-# Définition de tous les capteurs disponibles
+# Definition of all available sensors
 SENSORS: tuple[ACITSensorEntityDescription, ...] = (
-    # Capteurs climat (ThermACEC, Accubloc)
+    # Climate sensors (ThermACEC, Accubloc)
     ACITSensorEntityDescription(
         key="temperature",
         translation_key="temperature",
@@ -83,7 +83,7 @@ SENSORS: tuple[ACITSensorEntityDescription, ...] = (
         value_fn=lambda data: data.get("fan_speed"),
         required_feature=ACITFeature.FAN,
     ),
-    # Capteurs énergie (EMS)
+    # Energy sensors (EMS)
     ACITSensorEntityDescription(
         key="power",
         translation_key="power",
@@ -136,30 +136,30 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Configurer les capteurs ACIT."""
+    """Set up ACIT sensors."""
     coordinator: ACITThermACECCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    # Récupérer les features supportées par l'appareil
+    # Get features supported by the device
     from .models import get_supported_features
     supported_features = get_supported_features(coordinator.device_info)
 
     _LOGGER.debug(
-        f"Configuration des capteurs pour {coordinator.device_info.get('model')} "
-        f"avec features: {supported_features}"
+        f"Setting up sensors for {coordinator.device_info.get('model')} "
+        f"with features: {supported_features}"
     )
 
-    # Créer les entités selon les features supportées
+    # Create entities based on supported features
     entities = []
     for description in SENSORS:
-        # Vérifier si la feature est requise et supportée
+        # Check if the required feature is supported
         if description.required_feature is not None:
             if description.required_feature not in supported_features:
                 _LOGGER.debug(
-                    f"Capteur {description.key} ignoré (feature {description.required_feature} non supportée)"
+                    f"Sensor {description.key} skipped (feature {description.required_feature} not supported)"
                 )
                 continue
 
-        # Vérifier si les données existent
+        # Check if data exists
         if description.exists_fn(coordinator.data):
             entities.append(ACITSensorEntity(coordinator, entry, description))
 
@@ -167,7 +167,7 @@ async def async_setup_entry(
 
 
 class ACITSensorEntity(CoordinatorEntity, SensorEntity):
-    """Représente un capteur ACIT ThermACEC."""
+    """Represents an ACIT ThermACEC sensor."""
 
     entity_description: ACITSensorEntityDescription
     _attr_has_entity_name = True
@@ -178,7 +178,7 @@ class ACITSensorEntity(CoordinatorEntity, SensorEntity):
         entry: ConfigEntry,
         entity_description: ACITSensorEntityDescription,
     ) -> None:
-        """Initialiser le capteur."""
+        """Initialize the sensor."""
         super().__init__(coordinator)
         self.entity_description = entity_description
 
@@ -191,17 +191,17 @@ class ACITSensorEntity(CoordinatorEntity, SensorEntity):
             "name": entry.data.get("device_name", "ACIT ThermACEC"),
             "manufacturer": device_info.get("manufacturer", "ACIT"),
             "model": device_info.get("model", "ThermACEC"),
-            "sw_version": device_info.get("version", "Non disponible"),
+            "sw_version": device_info.get("version", "Unavailable"),
         }
 
     @property
     def native_value(self) -> StateType:
-        """Retourner la valeur du capteur."""
+        """Return the sensor value."""
         return self.entity_description.value_fn(self.coordinator.data)
 
     @property
     def available(self) -> bool:
-        """Retourner si l'entité est disponible."""
+        """Return whether the entity is available."""
         return (
             self.coordinator.data.get("available", False)
             and self.native_value is not None

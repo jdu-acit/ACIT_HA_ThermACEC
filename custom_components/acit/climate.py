@@ -1,4 +1,4 @@
-"""Entité Climate pour ACIT ThermACEC."""
+"""Climate entity for ACIT ThermACEC."""
 from __future__ import annotations
 
 import logging
@@ -27,30 +27,30 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Configurer l'entité climate ACIT ThermACEC."""
+    """Set up the ACIT ThermACEC climate entity."""
     coordinator: ACITThermACECCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    # Vérifier si l'appareil supporte le climat
+    # Check if the device supports climate
     supported_features = get_supported_features(coordinator.device_info)
 
-    # Créer l'entité climate seulement si supportée
+    # Create the climate entity only if supported
     if ACITFeature.TEMPERATURE in supported_features:
         async_add_entities([
             ACITThermACECClimate(coordinator, entry),
         ])
     else:
         _LOGGER.debug(
-            f"Climate non créé pour {coordinator.device_info.get('model')} "
-            f"(feature temperature non supportée)"
+            f"Climate entity not created for {coordinator.device_info.get('model')} "
+            f"(temperature feature not supported)"
         )
 
 
 class ACITThermACECClimate(CoordinatorEntity, ClimateEntity):
-    """Entité Climate pour ACIT ThermACEC."""
+    """Climate entity for ACIT ThermACEC."""
 
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
-    _attr_hvac_modes = [HVACMode.HEAT]  # Mode simplifié pour v2.0
+    _attr_hvac_modes = [HVACMode.HEAT]  # Simplified mode for v2.0
     _attr_min_temp = MIN_TEMP
     _attr_max_temp = MAX_TEMP
     _attr_target_temperature_step = TEMP_STEP
@@ -61,7 +61,7 @@ class ACITThermACECClimate(CoordinatorEntity, ClimateEntity):
         coordinator: ACITThermACECCoordinator,
         entry: ConfigEntry,
     ) -> None:
-        """Initialiser l'entité climate."""
+        """Initialize the climate entity."""
         super().__init__(coordinator)
         device_info = coordinator.device_info
         mac_address = device_info.get("mac_address", entry.entry_id)
@@ -73,57 +73,57 @@ class ACITThermACECClimate(CoordinatorEntity, ClimateEntity):
             "name": entry.data.get("device_name", "ACIT ThermACEC"),
             "manufacturer": device_info.get("manufacturer", "ACIT"),
             "model": device_info.get("model", "ThermACEC"),
-            "sw_version": device_info.get("version", "Non disponible"),
+            "sw_version": device_info.get("version", "Unavailable"),
         }
 
-        # Mettre à jour les limites de température depuis la config de l'appareil
+        # Update temperature limits from device config
         if device_info:
             self._attr_min_temp = device_info.get("min_temp", MIN_TEMP)
             self._attr_max_temp = device_info.get("max_temp", MAX_TEMP)
 
     @property
     def current_temperature(self) -> float | None:
-        """Retourner la température actuelle."""
+        """Return the current temperature."""
         return self.coordinator.data.get("temperature")
 
     @property
     def target_temperature(self) -> float | None:
-        """Retourner la température cible."""
+        """Return the target temperature."""
         return self.coordinator.data.get("target_temperature")
 
     @property
     def hvac_mode(self) -> HVACMode:
-        """Retourner le mode HVAC actuel."""
-        # Pour v2.0, mode simplifié basé sur heater_level
+        """Return the current HVAC mode."""
+        # For v2.0, simplified mode based on heater_level
         heater_level = self.coordinator.data.get("heater_level", 0)
         return HVACMode.HEAT if heater_level > 0 else HVACMode.HEAT
 
     @property
     def available(self) -> bool:
-        """Retourner si l'entité est disponible."""
+        """Return whether the entity is available."""
         return self.coordinator.data.get("available", False)
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
-        """Définir la température cible."""
+        """Set the target temperature."""
         if (temperature := kwargs.get(ATTR_TEMPERATURE)) is None:
             return
 
-        _LOGGER.debug(f"Définition de la température cible: {temperature}°C")
+        _LOGGER.debug(f"Setting target temperature: {temperature}°C")
         await self.coordinator.async_set_target_temperature(temperature)
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
-        """Définir le mode HVAC."""
-        # Pour v2.0, le mode est toujours HEAT (contrôlé automatiquement par l'appareil)
-        _LOGGER.debug(f"Mode HVAC: {hvac_mode} (géré automatiquement par l'appareil)")
+        """Set the HVAC mode."""
+        # For v2.0, the mode is always HEAT (automatically managed by the device)
+        _LOGGER.debug(f"HVAC mode: {hvac_mode} (automatically managed by the device)")
 
     @property
     def icon(self) -> str:
-        """Retourner l'icône de l'entité."""
+        """Return the entity icon."""
         return "mdi:thermostat"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Retourner les attributs d'état supplémentaires."""
+        """Return additional state attributes."""
         return {
             "heater_level": self.coordinator.data.get("heater_level"),
             "fan_speed": self.coordinator.data.get("fan_speed"),

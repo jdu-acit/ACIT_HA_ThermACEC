@@ -1,4 +1,4 @@
-"""Définitions des modèles d'appareils ACIT."""
+"""ACIT device model definitions."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,7 +7,7 @@ from typing import Any
 
 
 class ACITModel(StrEnum):
-    """Modèles d'appareils ACIT supportés."""
+    """Supported ACIT device models."""
 
     THERMACEC = "ThermACEC"
     ACCUBLOC = "Accubloc"
@@ -16,30 +16,30 @@ class ACITModel(StrEnum):
 
 
 class ACITFeature(StrEnum):
-    """Features disponibles sur les appareils ACIT."""
+    """Features available on ACIT devices."""
 
-    # Climat
+    # Climate
     TEMPERATURE = "temperature"
     TARGET_TEMPERATURE = "target_temperature"
     HEATING = "heating"
     COOLING = "cooling"
     FAN = "fan"
 
-    # Énergie (EMS)
+    # Energy (EMS)
     POWER_MONITORING = "power_monitoring"
     ENERGY_IMPORT = "energy_import"
     ENERGY_EXPORT = "energy_export"
     BATTERY = "battery"
     SOLAR = "solar"
 
-    # Contrôle (EMS)
+    # Control (EMS)
     RELAY_CONTROL = "relay_control"
     LOAD_SHEDDING = "load_shedding"
 
 
 @dataclass
 class ACITModelConfig:
-    """Configuration d'un modèle d'appareil ACIT."""
+    """Configuration for an ACIT device model."""
 
     model: ACITModel
     name: str
@@ -49,7 +49,7 @@ class ACITModelConfig:
     icon: str
 
 
-# Configurations des modèles
+# Model configurations
 MODEL_CONFIGS: dict[str, ACITModelConfig] = {
     ACITModel.THERMACEC: ACITModelConfig(
         model=ACITModel.THERMACEC,
@@ -95,33 +95,33 @@ MODEL_CONFIGS: dict[str, ACITModelConfig] = {
 
 
 def get_model_config(model_name: str) -> ACITModelConfig:
-    """Récupérer la configuration d'un modèle."""
-    # Normaliser le nom du modèle
+    """Get the configuration for a model."""
+    # Normalize the model name
     model_name = model_name.strip()
 
-    # Chercher une correspondance exacte
+    # Look for an exact match
     if model_name in MODEL_CONFIGS:
         return MODEL_CONFIGS[model_name]
 
-    # Chercher une correspondance partielle (case-insensitive)
+    # Look for a partial match (case-insensitive)
     model_name_lower = model_name.lower()
     for key, config in MODEL_CONFIGS.items():
         if key.lower() in model_name_lower or model_name_lower in key.lower():
             return config
 
-    # Modèle inconnu - utiliser ThermACEC par défaut
+    # Unknown model - default to ThermACEC
     return MODEL_CONFIGS[ACITModel.THERMACEC]
 
 
 def get_supported_features(device_info: dict[str, Any]) -> list[ACITFeature]:
-    """Déterminer les features supportées par un appareil."""
+    """Determine the features supported by a device."""
     model_name = device_info.get("model", "ThermACEC")
     model_config = get_model_config(model_name)
 
-    # Commencer avec les features par défaut du modèle
+    # Start with the model's default features
     features = list(model_config.default_features)
 
-    # Ajouter les features déclarées par l'appareil
+    # Add features declared by the device
     device_features = device_info.get("features", [])
     for feature in device_features:
         try:
@@ -129,7 +129,7 @@ def get_supported_features(device_info: dict[str, Any]) -> list[ACITFeature]:
             if acit_feature not in features:
                 features.append(acit_feature)
         except ValueError:
-            # Feature inconnue, ignorer
+            # Unknown feature, skip
             pass
 
     return features

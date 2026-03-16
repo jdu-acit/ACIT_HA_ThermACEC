@@ -1,4 +1,4 @@
-"""ACIT ThermACEC Integration pour Home Assistant."""
+"""ACIT ThermACEC Integration for Home Assistant."""
 from __future__ import annotations
 
 import logging
@@ -18,20 +18,20 @@ PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.CLIMATE, Platform.UPDATE]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Configurer l'intégration ACIT ThermACEC à partir d'une entrée de configuration."""
-    _LOGGER.debug("Configuration de l'intégration ACIT ThermACEC")
+    """Set up the ACIT ThermACEC integration from a config entry."""
+    _LOGGER.debug("Setting up ACIT ThermACEC integration")
 
-    # Créer le coordinateur de données
+    # Create the data coordinator
     coordinator = ACITThermACECCoordinator(hass, entry)
 
-    # Initialiser la connexion
+    # Initialize the connection
     await coordinator.async_config_entry_first_refresh()
 
-    # Stocker le coordinateur
+    # Store the coordinator
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    # Enregistrer l'appareil
+    # Register the device
     device_info = coordinator.device_info
     device_registry = dr.async_get(hass)
     device_registry.async_get_or_create(
@@ -40,66 +40,66 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         manufacturer=device_info.get("manufacturer", "ACIT"),
         name=entry.data.get("device_name", "ACIT ThermACEC"),
         model=device_info.get("model", "ThermACEC"),
-        sw_version=device_info.get("version", "Non disponible"),
+        sw_version=device_info.get("version", "Unavailable"),
     )
 
-    # Configurer les plateformes
+    # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Enregistrer les services
+    # Register services
     async def async_check_update(call: ServiceCall) -> None:
-        """Service pour vérifier manuellement les mises à jour."""
+        """Service to manually check for OTA updates."""
         device_id = call.data.get("device_id")
 
         if not device_id:
-            _LOGGER.error("Aucun device_id fourni pour le service check_update")
+            _LOGGER.error("No device_id provided for check_update service")
             return
 
-        # Récupérer le device registry pour trouver l'entry_id
+        # Get the device registry to find the entry_id
         device_registry = dr.async_get(hass)
         device_entry = device_registry.async_get(device_id)
 
         if not device_entry:
-            _LOGGER.error("Appareil non trouvé: %s", device_id)
+            _LOGGER.error("Device not found: %s", device_id)
             return
 
-        # Trouver le coordinateur correspondant
+        # Find the corresponding coordinator
         for entry_id in device_entry.config_entries:
             coordinator = hass.data[DOMAIN].get(entry_id)
             if coordinator and isinstance(coordinator, ACITThermACECCoordinator):
                 await coordinator.async_check_ota_update()
                 await coordinator.async_request_refresh()
-                _LOGGER.info("Vérification des mises à jour OTA lancée pour %s", device_id)
+                _LOGGER.info("OTA update check triggered for %s", device_id)
                 return
 
-        _LOGGER.error("Coordinateur non trouvé pour l'appareil: %s", device_id)
+        _LOGGER.error("Coordinator not found for device: %s", device_id)
 
     hass.services.async_register(DOMAIN, "check_update", async_check_update)
 
-    _LOGGER.info("Intégration ACIT ThermACEC configurée avec succès")
+    _LOGGER.info("ACIT ThermACEC integration set up successfully")
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Décharger une entrée de configuration."""
-    _LOGGER.debug("Déchargement de l'intégration ACIT ThermACEC")
+    """Unload a config entry."""
+    _LOGGER.debug("Unloading ACIT ThermACEC integration")
 
-    # Décharger les plateformes
+    # Unload platforms
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok:
-        # Arrêter le coordinateur
+        # Shut down the coordinator
         coordinator: ACITThermACECCoordinator = hass.data[DOMAIN][entry.entry_id]
         await coordinator.async_shutdown()
 
-        # Supprimer les données
+        # Remove the data
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
 
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Recharger l'entrée de configuration."""
+    """Reload a config entry."""
     await async_unload_entry(hass, entry)
     await async_setup_entry(hass, entry)
 
