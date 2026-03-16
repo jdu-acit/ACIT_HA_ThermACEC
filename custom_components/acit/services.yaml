@@ -1,10 +1,10 @@
 check_update:
-  name: Vérifier les mises à jour
-  description: Vérifier manuellement si une mise à jour OTA est disponible
+  name: Check for updates
+  description: Manually check whether an OTA update is available
   fields:
     device_id:
-      name: Appareil
-      description: L'appareil ACIT à vérifier
+      name: Device
+      description: The ACIT device to check
       required: true
       selector:
         device:
